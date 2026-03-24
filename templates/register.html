@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>用户注册</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .form-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="form-container">
+    <h2>账号注册</h2>
+    {% with messages = get_flashed_messages() %}{% if messages %}<div style="color:red;text-align:center;">{{ messages[0] }}</div>{% endif %}{% endwith %}
+    <form method="POST">
+        <input type="text" name="phone" placeholder="请输入手机号" required>
+        <input type="password" name="password" placeholder="请输入密码" required>
+        <button type="submit">注 册</button>
+    </form>
+    <div style="text-align:center;margin-top:10px;"><a href="/">返回登录</a></div>
+</div>
+</body>
+</html>

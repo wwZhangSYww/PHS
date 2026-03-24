@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>超级管理员后台</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f0f2f5; }
+        .sidebar { width: 250px; background-color: #2c3e50; color: white; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .top-info { border-bottom: 1px solid #455a64; padding-bottom: 15px; margin-bottom: 15px; }
+        .main-content { flex-grow: 1; padding: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-content: start;}
+        .module-card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; font-size: 18px; font-weight: bold; cursor: pointer; text-decoration: none; color: #333; display: flex; align-items: center; justify-content: center; min-height: 120px; transition: 0.3s;}
+        .module-card:hover { background-color: #e9ecef; }
+        .bottom-links a { color: #bdc3c7; text-decoration: none; font-size: 14px; margin-top: 15px; display: block; }
+        .notice-board { background: #fff; border-radius: 5px; padding: 15px; margin-bottom: 15px; color: #333; flex-grow: 1; overflow-y: auto;}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="top-info">
+        <h3>欢迎您，管理员1号</h3>
+        <p style="font-size: 12px; color: #bdc3c7; margin: 0;">超级管理员</p>
+    </div>
+
+    <h4 style="margin: 0 0 10px 0; color: white;">系统上报看板</h4>
+    <div style="background-color: #34495e; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
+        {% if alert_events and alert_events|length > 0 %}
+            <div style="background-color: #dc3545; padding: 15px; border-radius: 6px;">
+                <h4 style="margin: 0 0 10px 0; color: white;">! 突发高危预警</h4>
+                <p style="margin: 0 0 15px 0; font-size: 13px;">系统检测到 <strong>{{ alert_events|length }}</strong> 起高危事件。</p>
+                <a href="/admin/event_response" style="background: white; color: #dc3545; padding: 8px 15px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px; display: block; text-align: center;">前往处理</a>
+            </div>
+        {% else %}
+            <p style="color: #bdc3c7; font-size: 14px; text-align: center; margin-top: 20px;">当前系统无高危事件。</p>
+        {% endif %}
+    </div>
+
+    <h4 style="margin: 0 0 10px 0; color: white;">系统公告</h4>
+    <div class="notice-board">
+        {% if admin_notices %}
+            {% for n in admin_notices %}
+                <div style="border-bottom: 1px dashed #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                    <strong style="color: #d35400;">{{ n.title }}</strong>
+                    <span style="font-size: 12px; color: #999; float: right;">{{ n.create_time.strftime('%m-%d') }}</span>
+                    <p style="margin: 5px 0 0 0; font-size: 13px;">{{ n.content }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: #999; font-size: 13px; margin: 0; text-align: center;">暂无公告</p>
+        {% endif %}
+    </div>
+
+    <div class="bottom-links">
+        <a href="/admin/event_response#notice_manage">公告编辑管理</a>
+        <a href="/logout" style="color: #e74c3c;">退出账号</a>
+    </div>
+</div>
+
+<div class="main-content">
+    <a href="/admin/manage_accounts" class="module-card">管理账号功能</a>
+    <a href="/admin/health_data_select" class="module-card">健康数据管理</a>
+    <a href="/admin/disease_manage" class="module-card">病因与疾病信息管理</a>
+    <a href="/admin/event_audit" class="module-card">公共卫生事件审核与管理</a>
+    <a href="/admin/event_response" class="module-card" style="grid-column: span 2;">公共卫生事件响应处理</a>
+</div>
+</body>
+</html>

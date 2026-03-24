@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>个人账号管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 600px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; }
+        .header-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        .form-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; background-color: #e9ecef; color: #555; cursor: not-allowed; }
+        .btn-back { padding: 8px 15px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; }
+        .pwd-link { color: #007bff; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-nav">
+        <h3 style="margin: 0;">欢迎您，{{ user.name }}</h3>
+        <div>
+            <a href="/change_password" class="pwd-link">更改密码</a>
+            <span style="margin: 0 10px;">|</span>
+            <a href="/user_dashboard" class="btn-back">返回系统主页</a>
+        </div>
+    </div>
+
+    <div class="form-grid">
+        <div class="form-group"><label>手机号(账号)</label><input type="text" value="{{ user.phone }}" disabled></div>
+        <div class="form-group"><label>姓名</label><input type="text" value="{{ user.name }}" disabled></div>
+        <div class="form-group"><label>性别</label><input type="text" value="{{ user.gender }}" disabled></div>
+        <div class="form-group"><label>血型</label><input type="text" value="{{ user.blood_type }}" disabled></div>
+        <div class="form-group"><label>身高 (cm)</label><input type="text" value="{{ user.height }}" disabled></div>
+        <div class="form-group"><label>体重 (kg)</label><input type="text" value="{{ user.weight }}" disabled></div>
+        <div class="form-group" style="grid-column: span 2;"><label>居住地区</label><input type="text" value="{{ user.province }} {{ user.city }} {{ user.community }}" disabled></div>
+        <div class="form-group" style="grid-column: span 2;"><label>详细地址</label><input type="text" value="{{ user.address }}" disabled></div>
+    </div>
+</div>
+</body>
+</html>

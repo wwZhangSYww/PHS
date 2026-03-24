@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>用户档案管理 - {{ user.phone }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 800px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .danger-zone button { padding: 8px 15px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; margin-left: 10px;}
+        .btn-lock { background-color: #ffc107; color: black !important; }
+        .btn-delete { background-color: #dc3545; }
+
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .section-title { font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 15px; border-left: 4px solid #007bff; padding-left: 10px; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .form-group input:disabled { background-color: #e9ecef; cursor: not-allowed; }
+
+        .family-box { border: 1px dashed #ccc; padding: 20px; text-align: center; border-radius: 8px; background-color: #f8f9fa; color: #6c757d; }
+        .submit-btn { width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+
+        /* 补充家庭成员按钮样式 */
+        .btn-sm { padding: 5px 10px; font-size: 12px; cursor: pointer; border: none; border-radius: 3px; color: white; display: inline-block;}
+        .btn-edit { background-color: #17a2b8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0;">用户档案管理: {{ user.name if user.name else '未命名用户' }}</h2>
+        <div class="danger-zone">
+            <button class="btn-lock" onclick="alert('请在批处理页面操作！')">锁定该账号</button>
+            <button class="btn-delete" onclick="alert('请在批处理页面操作！')">删除该账号</button>
+            <a href="javascript:history.back()" style="margin-left: 15px; text-decoration: none; color: #007bff;">返回上一页</a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 20px; text-align: center;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="grid-layout">
+            <div>
+                <div class="section-title">基础数据修改</div>
+                <div class="form-group"><label>手机号 (账号唯一标识，禁止修改)</label><input type="text" value="{{ user.phone }}" disabled></div>
+                <div class="form-group"><label>姓名</label><input type="text" name="name" value="{{ user.name or '' }}"></div>
+                <div class="form-group"><label>性别</label>
+                    <select name="gender">
+                        <option value="男" {{ 'selected' if user.gender == '男' else '' }}>男</option>
+                        <option value="女" {{ 'selected' if user.gender == '女' else '' }}>女</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>血型</label>
+                    <select name="blood_type">
+                        <option value="A型" {{ 'selected' if user.blood_type == 'A型' else '' }}>A型</option>
+                        <option value="B型" {{ 'selected' if user.blood_type == 'B型' else '' }}>B型</option>
+                        <option value="AB型" {{ 'selected' if user.blood_type == 'AB型' else '' }}>AB型</option>
+                        <option value="O型" {{ 'selected' if user.blood_type == 'O型' else '' }}>O型</option>
+                        <option value="未知" {{ 'selected' if user.blood_type == '未知' else '' }}>未知</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;"><label>身高 (cm)</label><input type="number" step="0.1" name="height" value="{{ user.height or '' }}"></div>
+                    <div class="form-group" style="flex: 1;"><label>体重 (kg)</label><input type="number" step="0.1" name="weight" value="{{ user.weight or '' }}"></div>
+                </div>
+                <div class="form-group"><label>详细地址</label><input type="text" name="address" value="{{ user.address or '' }}"></div>
+            </div>
+
+            <div>
+                <div class="section-title">账户安全管理</div>
+                <div class="form-group"><label>强制重置用户密码 (留空则不修改)</label><input type="password" name="new_password" placeholder="输入新密码"></div>
+
+                <div class="section-title" style="margin-top: 30px;">智慧家庭医生管理 (已关联档案)</div>
+                <div class="family-box" style="text-align: left; padding: 15px;">
+                    {% if user.family_members %}
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                        {% for m in user.family_members %}
+                            <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                                <span><strong>成员{{ loop.index }} ({{ m.relation }}):</strong> {{ m.name }} | {{ m.gender }} | {{ m.age or '年龄未知' }}</span>
+                                <a href="/admin/health_data/{{ m.id }}" class="btn-sm btn-edit" style="text-decoration:none; padding: 4px 8px;">查看与管理</a>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p style="text-align: center; margin: 0; font-size: 14px;">该用户暂未绑定家庭成员数据。</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if not user.is_locked %}
+        <button type="submit" class="submit-btn">保存并更新用户数据</button>
+        {% else %}
+        <button type="button" class="submit-btn" style="background-color: #6c757d; cursor: not-allowed;" disabled>账号已被锁定，禁止保存</button>
+        {% endif %}
+    </form>
+</div>
+
+</body>
+</html>

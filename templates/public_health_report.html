@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>突发公共卫生事件报告</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 800px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        button[type="submit"] { padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px; }
+
+        /* 锁定状态置灰 */
+        button:disabled { background-color: #ccc !important; cursor: not-allowed; color: #666 !important; }
+        input:disabled, select:disabled, textarea:disabled { background-color: #e9ecef; cursor: not-allowed; color: #666; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
+        th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">突发公共卫生事件报告</h2>
+        <a href="/user_dashboard" style="color: #6c757d; font-weight: bold; text-decoration: none;">返回主页</a>
+    </div>
+
+    <form method="POST" action="/public_health_report">
+        <div class="grid-2">
+            <div class="form-group">
+                <label>疾病分类</label>
+                <select name="disease_category" id="cat" onchange="bindSub()" required {% if user.is_locked %}disabled{% endif %}><option value="">选择分类</option></select>
+            </div>
+            <div class="form-group">
+                <label>疾病类型</label>
+                <select name="disease_sub_category" id="sub" onchange="bindSpec()" {% if user.is_locked %}disabled{% endif %}><option value="">选择类型</option></select>
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <label>具体疾病 (必填)</label>
+                <select name="disease_specific" id="spec" required {% if user.is_locked %}disabled{% endif %}><option value="">选择具体疾病</option></select>
+            </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 10px;">
+            <div class="form-group"><label>发生省份</label><select id="province" name="province" required {% if user.is_locked %}disabled{% endif %}><option value="">选择省份</option></select></div>
+            <div class="form-group"><label>发生城市</label><select id="city" name="city" required {% if user.is_locked %}disabled{% endif %}><option value="">选择城市</option></select></div>
+            <div class="form-group"><label>区/县</label><select id="area" {% if user.is_locked %}disabled{% endif %}><option value="">选择区/县</option></select></div>
+            <div class="form-group"><label>街道</label><select id="street" {% if user.is_locked %}disabled{% endif %}><option value="">选择街道</option></select></div>
+        </div>
+        <input type="hidden" id="community_hidden" name="community">
+
+        <div class="form-group">
+            <label>详细发生位置</label>
+            <input type="text" name="specific_location" required {% if user.is_locked %}disabled{% endif %}>
+        </div>
+        <div class="form-group">
+            <label>联系方式</label>
+            <input type="text" name="contact" value="{{ user.phone }}" required {% if user.is_locked %}disabled{% endif %}>
+        </div>
+        <div class="form-group">
+            <label>事件详细描述</label>
+            <textarea name="content" rows="4" required {% if user.is_locked %}disabled{% endif %}></textarea>
+        </div>
+
+        <button type="submit" {% if user.is_locked %}disabled{% endif %}>
+            {% if user.is_locked %}您的数据已被锁定{% else %}提交报告{% endif %}
+        </button>
+    </form>
+
+    <div style="margin-top: 40px; border-top: 2px solid #eee; padding-top: 20px;">
+        <h3 style="margin-top: 0; color: #2c3e50;">我的上报记录</h3>
+        <table>
+            <tr>
+                <th>提交时间</th>
+                <th>疾病名称</th>
+                <th>发生地点</th>
+                <th>当前状态</th>
+            </tr>
+            {% for r in my_reports %}
+            <tr>
+                <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ r.disease_specific }}</td>
+                <td>{{ r.province }}{{ r.city }}<br><span style="font-size:12px;color:#666;">{{ r.specific_location }}</span></td>
+                <td style="font-weight: bold; color: {{ '#28a745' if r.status == 'processed' else '#dc3545' }};">
+                    {{ '已处理' if r.status == 'processed' else '正在处理' }}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% if not my_reports %}
+            <p style="text-align: center; color: #999; font-size: 14px; margin-top: 15px;">暂无提交记录。</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    let illnessData = {};
+    fetch("{{ url_for('static', filename='data/illness.json') }}").then(r => r.json()).then(d => {
+        illnessData = d;
+        let catSel = document.getElementById('cat');
+        for (let cat in illnessData) catSel.add(new Option(cat, cat));
+    });
+
+    function bindSub() {
+        let cat = document.getElementById('cat').value, subSel = document.getElementById('sub'), specSel = document.getElementById('spec');
+        subSel.length = 1; specSel.length = 1;
+        if (cat && illnessData[cat]) for (let sub in illnessData[cat]) subSel.add(new Option(sub, sub));
+    }
+
+    function bindSpec() {
+        let cat = document.getElementById('cat').value, sub = document.getElementById('sub').value, specSel = document.getElementById('spec');
+        specSel.length = 1;
+        if (cat && sub && illnessData[cat][sub]) {
+            let specs = illnessData[cat][sub];
+            for (let i=0; i<specs.length; i++) specSel.add(new Option(specs[i], specs[i]));
+        }
+    }
+
+    const pSel = document.getElementById('province'), cSel = document.getElementById('city'), aSel = document.getElementById('area'), sSel = document.getElementById('street'), commHidden = document.getElementById('community_hidden');
+    let geoData = {};
+    fetch("{{ url_for('static', filename='data/pcas.json') }}").then(res => res.json()).then(data => {
+        geoData = data;
+        for (let p in geoData) pSel.add(new Option(p, p));
+    });
+
+    pSel.addEventListener('change', function() { cSel.length=1; aSel.length=1; sSel.length=1; commHidden.value=""; let p = this.value; if (p && geoData[p]) for (let c in geoData[p]) cSel.add(new Option(c, c)); });
+    cSel.addEventListener('change', function() { aSel.length=1; sSel.length=1; commHidden.value=""; let p = pSel.value, c = this.value; if (p && c && geoData[p][c]) for (let a in geoData[p][c]) aSel.add(new Option(a, a)); });
+    aSel.addEventListener('change', function() { sSel.length=1; commHidden.value=""; let p = pSel.value, c = cSel.value, a = this.value; if (p && c && a && geoData[p][c][a]) { let strts = geoData[p][c][a]; for (let i=0; i<strts.length; i++) sSel.add(new Option(strts[i], strts[i])); } });
+    sSel.addEventListener('change', function(){ commHidden.value = (aSel.value && sSel.value) ? aSel.value + "-" + sSel.value : ""; });
+</script>
+</body>
+</html>

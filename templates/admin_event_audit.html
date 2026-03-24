@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>公共卫生事件审核与管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .admin-info { font-size: 14px; color: #666; margin-bottom: 15px; }
+        .action-bar { display: flex; justify-content: space-between; margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #e9ecef;}
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; cursor: pointer; border: none; border-radius: 3px; color: white; font-weight: bold;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">公共卫生事件审核与管理</h2>
+        <a href="{{ '/super_admin_dashboard' if session.get('role') == 'super' else '/sub_admin_dashboard' }}" style="text-decoration: none; color: #6c757d; font-weight: bold;">返回主页</a>
+    </div>
+
+    <div class="admin-info">
+        <strong>当前操作人员：</strong> {{ admin.name }}
+        <span style="color:#007bff;">[{{ '超级管理员' if admin.role == 'super' else '次级管理员' }}]</span>
+    </div>
+
+    <form id="auditForm" method="POST" action="/admin/event_audit">
+        <input type="hidden" name="action" id="auditAction" value="">
+
+        <div class="action-bar">
+            <div>
+                <button type="button" class="btn-sm" style="background-color: #28a745;" onclick="submitAudit('process')">标记为已处理</button>
+
+                {% if admin.role != 'super' %}
+                <button type="button" class="btn-sm" style="background-color: #dc3545;" onclick="submitAudit('escalate')">升级上报 (危重)</button>
+                {% endif %}
+
+                {% if admin.role == 'super' %}
+                <button type="button" class="btn-sm" style="background-color: #ffc107; color: black; margin-left: 15px;" onclick="submitAudit('lock')">锁定记录</button>
+                <button type="button" class="btn-sm" style="background-color: #dc3545;" onclick="submitAudit('delete')">彻底删除</button>
+                {% endif %}
+            </div>
+            <div style="font-size: 13px; color: #dc3545; font-weight:bold;">(次级管理员无权核销已升级或危重事件)</div>
+        </div>
+
+        <table>
+            <tr>
+                <th style="width: 40px;"><input type="checkbox" onclick="let cb=document.querySelectorAll('input[name=ids]'); cb.forEach(c=>c.checked=this.checked);"></th>
+                <th>事件概览</th>
+                <th>上报地点</th>
+                <th>汇报人联络</th>
+                <th>处理状态</th>
+                <th>操作</th>
+            </tr>
+            {% for ev in events %}
+            <tr>
+                <td><input type="checkbox" name="ids" value="{{ ev.id }}" data-severe="{{ 'True' if ev.is_severe or ev.status == 'escalated' else 'False' }}"></td>
+                <td>
+                    <strong style="color: {{ '#dc3545' if ev.is_severe else '#333' }};">疾病：{{ ev.disease_specific }}</strong><br>
+                    <span style="font-size:12px; color:#666;">大类: {{ ev.disease_category }}</span>
+                </td>
+                <td>
+                    {{ ev.province }}{{ ev.city }}<br>
+                    <span style="color:#007bff; font-size:12px;">具体: {{ ev.specific_location }}</span>
+                </td>
+                <td>{{ ev.contact }}</td>
+                <td style="font-weight:bold; color: {{ '#28a745' if ev.status == 'processed' else ('#dc3545' if ev.status == 'escalated' else '#ffc107') }};">
+                    {% if ev.status == 'pending' %}待处理
+                    {% elif ev.status == 'processed' %}已处理
+                    {% elif ev.status == 'escalated' %}正在处理(升级)
+                    {% endif %}
+                </td>
+                <td>
+                    <button type="button" class="btn-sm" style="background-color: #17a2b8;" onclick="alert('内容详情：\n\n{{ ev.content|replace('\n', ' ') }}')">查看</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </form>
+</div>
+
+<script>
+    function submitAudit(actionStr) {
+        let form = document.getElementById('auditForm');
+        let checkboxes = form.querySelectorAll('input[name="ids"]:checked');
+
+        if (checkboxes.length === 0) {
+            alert("请勾选事件记录！");
+            return;
+        }
+
+        if (actionStr === 'process' && "{{ admin.role }}" !== "super") {
+            for(let i=0; i<checkboxes.length; i++) {
+                if (checkboxes[i].getAttribute('data-severe') === 'True') {
+                    alert("权限拒绝：次级管理员无权处理危重或已升级的事件，请交由超管核销！");
+                    return;
+                }
+            }
+        }
+
+        if (confirm("确定要执行此操作吗？")) {
+            document.getElementById('auditAction').value = actionStr;
+            form.submit();
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>智慧家庭医生管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 950px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .btn-back { padding: 8px 15px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; }
+        .btn-add { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;}
+        .btn-danger { background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        .btn-edit { background-color: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+
+        .control-bar { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e9ecef;}
+        .member-select { padding: 10px; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; width: 250px; font-weight: bold; color: #2c3e50; }
+
+        .member-card { display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 25px; margin-top: 10px; background: #fafafa; }
+        .member-card.active { display: block; }
+        .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .info-row { margin-bottom: 12px; font-size: 14px; border-bottom: 1px dashed #eee; padding-bottom: 8px;}
+        .info-label { font-weight: bold; color: #555; display: inline-block; width: 120px; }
+        .info-value { color: #111; font-weight: 500;}
+        .section-title { font-size: 16px; font-weight: bold; color: #007bff; margin-bottom: 15px; border-left: 4px solid #007bff; padding-left: 10px; }
+
+        /* 锁定状态置灰 */
+        button:disabled { background-color: #ccc !important; cursor: not-allowed; color: #666 !important; }
+        input:disabled, select:disabled { background-color: #e9ecef; cursor: not-allowed; color: #666; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;}
+        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 750px; max-height: 85vh; overflow-y: auto;}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 13px;}
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; box-sizing: border-box; border-radius: 4px;}
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .disease-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">智慧家庭医生管理</h2>
+        <a href="/user_dashboard" class="btn-back">返回主页</a>
+    </div>
+
+    <div class="control-bar">
+        <div>
+            <label style="font-weight: bold; margin-right: 10px;">选择家庭成员查看:</label>
+            <select class="member-select" id="memberSelector" onchange="switchMemberCard(this.value)">
+                {% for md in members_data %}
+                    <option value="card_{{ md.obj.id }}">{{ md.obj.name }} ({{ md.obj.relation }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn-add" onclick="openModal('add')" {% if user.is_locked %}disabled{% endif %}>
+            {% if user.is_locked %}已锁定{% else %}+ 新增家庭成员{% endif %}
+        </button>
+    </div>
+
+    {% for md in members_data %}
+    <div id="card_{{ md.obj.id }}" class="member-card {% if loop.first %}active{% endif %}">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #2c3e50;">{{ md.obj.name }} 的健康档案</h3>
+            <div>
+                <button class="btn-edit" onclick='openModal("edit", {{ md.obj.id }})' {% if user.is_locked %}disabled{% endif %}>修改信息</button>
+                {% if md.obj.relation != '本人' %}
+                <form method="POST" action="/family_management" onsubmit="return confirm('确定要删除此档案吗？');" style="display:inline; margin-left: 10px;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="member_id" value="{{ md.obj.id }}">
+                    <button type="submit" class="btn-danger" {% if user.is_locked %}disabled{% endif %}>移除</button>
+                </form>
+                {% else %}
+                <span style="color: #28a745; font-weight: bold; border: 1px solid #28a745; padding: 5px 10px; border-radius: 4px; margin-left: 10px;">主账号</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card-grid">
+            <div>
+                <div class="section-title">基础身份信息</div>
+                <div class="info-row"><span class="info-label">姓名:</span> <span class="info-value">{{ md.obj.name }}</span></div>
+                <div class="info-row"><span class="info-label">家庭关系:</span> <span class="info-value">{{ md.obj.relation }}</span></div>
+                <div class="info-row"><span class="info-label">性别:</span> <span class="info-value">{{ md.obj.gender }}</span></div>
+                <div class="info-row"><span class="info-label">年龄:</span> <span class="info-value">{{ md.obj.age if md.obj.age else '未填写' }}</span></div>
+                <div class="info-row"><span class="info-label">联系电话:</span> <span class="info-value">{{ md.obj.phone if md.obj.phone else '未填写' }}</span></div>
+                <div class="info-row"><span class="info-label">常住地区:</span> <span class="info-value">{{ (md.obj.province|default('')) ~ (md.obj.city|default('')) ~ (md.obj.community|default('')) }}</span></div>
+                <div class="info-row"><span class="info-label">详细住址:</span> <span class="info-value">{{ md.obj.address if md.obj.address else '未填写' }}</span></div>
+            </div>
+
+            <div>
+                <div class="section-title">生理指标与健康状况</div>
+                <div class="info-row">
+                    <span class="info-label">BMI 指数:</span>
+                    <span class="info-value">
+                        {% if md.bmi_val %}{{ md.bmi_val }} ({{ md.bmi_msg }}){% else %}未测录{% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">今日血压:</span>
+                    <span class="info-value">
+                        {% if md.bp_val %}{{ md.bp_val }} ({{ md.bp_msg }}){% else %}未填写{% endif %}
+                    </span>
+                </div>
+                <div class="info-row" style="margin-top: 10px;">
+                    <span class="info-label">已确诊疾病档案:</span>
+                    <div class="info-value" style="margin-top: 5px; line-height: 1.6; white-space: pre-wrap;">{{ md.obj.disease_info if md.obj.disease_info else '无记录' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="actionModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle" style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 10px;">成员档案操作</h3>
+        <form method="POST" action="/family_management" id="memberForm">
+            <input type="hidden" name="action" id="formAction" value="add">
+            <input type="hidden" name="member_id" id="memberId" value="">
+
+            <div class="section-title" style="margin-bottom: 10px;">基本身份</div>
+            <div class="grid-2">
+                <div class="form-group"><label>成员姓名</label><input type="text" name="name" id="f_name" required></div>
+                <div class="form-group"><label>家庭关系</label>
+                    <select name="relation" id="f_relation" required>
+                        <option value="">请选择关系</option>
+                        <option value="父亲">父亲</option>
+                        <option value="母亲">母亲</option>
+                        <option value="配偶">配偶</option>
+                        <option value="子女">子女</option>
+                        <option value="祖父母">祖父母</option>
+                        <option value="其他亲属">其他亲属</option>
+                        <option value="本人" id="rel_self_opt" style="display:none;">本人</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>性别</label>
+                    <select name="gender" id="f_gender" required><option value="男">男</option><option value="女">女</option></select>
+                </div>
+                <div class="form-group"><label>年龄</label><input type="number" name="age" id="f_age"></div>
+                <div class="form-group"><label>联系电话</label><input type="text" name="phone" id="f_phone"></div>
+            </div>
+
+            <div class="section-title" style="margin-top: 10px; margin-bottom: 10px;">居住信息</div>
+            <div class="grid-2">
+                <div class="form-group"><label>省份</label><select id="province" name="province"><option value="">请选择省份</option></select></div>
+                <div class="form-group"><label>城市</label><select id="city" name="city"><option value="">请选择城市</option></select></div>
+                <div class="form-group"><label>区/县</label><select id="area"><option value="">请选择区/县</option></select></div>
+                <div class="form-group"><label>街道/乡镇</label><select id="street"><option value="">请选择街道</option></select></div>
+            </div>
+            <input type="hidden" id="community_hidden" name="community">
+            <div class="form-group"><label>目前详细住址</label><input type="text" name="address" id="f_address" placeholder="手动填写街道门牌号"></div>
+
+            <div class="section-title" style="margin-top: 10px; margin-bottom: 10px;">生理与疾病指标</div>
+            <div class="grid-2">
+                <div class="form-group"><label>身高 (cm)</label><input type="number" step="0.1" name="height" id="f_height"></div>
+                <div class="form-group"><label>体重 (kg)</label><input type="number" step="0.1" name="weight" id="f_weight"></div>
+                <div class="form-group"><label>收缩压 (高压)</label><input type="number" name="bp_high" id="f_bp_high"></div>
+                <div class="form-group"><label>舒张压 (低压)</label><input type="number" name="bp_low" id="f_bp_low"></div>
+            </div>
+
+            <div class="form-group" style="background: #fdfdfd; padding: 15px; border: 1px solid #eee; border-radius: 4px;">
+                <label style="display:flex; justify-content:space-between;">
+                    <span>疾病登记</span>
+                    <button type="button" onclick="addDiseaseRow()" style="background:#007bff; color:white; border:none; padding:3px 10px; border-radius:3px; cursor:pointer;">添加</button>
+                </label>
+                <div id="disease_container"></div>
+            </div>
+
+            <div style="display:flex; justify-content: space-between; margin-top: 25px;">
+                <button type="submit" style="padding:10px 20px; background:#28a745; color:white; border:none; border-radius: 4px; cursor:pointer; font-weight:bold;">保存建档并上传系统</button>
+                <button type="button" style="padding:10px 20px; background:#6c757d; color:white; border:none; border-radius: 4px; cursor:pointer;" onclick="document.getElementById('actionModal').style.display='none'">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const membersDict = {
+        {% for md in members_data %}
+        "{{ md.obj.id }}": {
+            name: "{{ md.obj.name }}", relation: "{{ md.obj.relation }}", gender: "{{ md.obj.gender }}",
+            phone: "{{ md.obj.phone or '' }}", age: "{{ md.obj.age or '' }}",
+            province: "{{ md.obj.province or '' }}", city: "{{ md.obj.city or '' }}", address: "{{ md.obj.address or '' }}",
+            height: "{{ md.obj.height or '' }}", weight: "{{ md.obj.weight or '' }}",
+            bp_high: "{{ md.obj.blood_pressure_systolic or '' }}", bp_low: "{{ md.obj.blood_pressure_diastolic or '' }}"
+        },
+        {% endfor %}
+    };
+
+    function switchMemberCard(cardId) {
+        let cards = document.getElementsByClassName("member-card");
+        for (let i = 0; i < cards.length; i++) cards[i].classList.remove("active");
+        document.getElementById(cardId).classList.add("active");
+    }
+
+    function openModal(mode, id = null) {
+        let form = document.getElementById("memberForm");
+        form.reset();
+        document.getElementById("disease_container").innerHTML = '';
+        addDiseaseRow();
+
+        let relSelect = document.getElementById("f_relation");
+        document.getElementById("rel_self_opt").style.display = "none";
+        relSelect.disabled = false;
+
+        if (mode === "add") {
+            document.getElementById("modalTitle").innerText = "添加家庭成员";
+            document.getElementById("formAction").value = "add";
+        } else {
+            document.getElementById("modalTitle").innerText = "修改健康档案";
+            document.getElementById("formAction").value = "edit";
+            document.getElementById("memberId").value = id;
+
+            let d = membersDict[id];
+            document.getElementById("f_name").value = d.name;
+            document.getElementById("f_gender").value = d.gender;
+            document.getElementById("f_phone").value = d.phone;
+            document.getElementById("f_age").value = d.age;
+            document.getElementById("f_address").value = d.address;
+            document.getElementById("f_height").value = d.height;
+            document.getElementById("f_weight").value = d.weight;
+            document.getElementById("f_bp_high").value = d.bp_high;
+            document.getElementById("f_bp_low").value = d.bp_low;
+
+            if (d.relation === '本人') {
+                document.getElementById("rel_self_opt").style.display = "block";
+                relSelect.value = "本人";
+                relSelect.disabled = true;
+            } else {
+                relSelect.value = d.relation;
+            }
+        }
+        document.getElementById('actionModal').style.display = 'flex';
+    }
+
+    document.getElementById("memberForm").addEventListener("submit", function() {
+        document.getElementById("f_relation").disabled = false;
+    });
+
+    let illnessData = {};
+    fetch("{{ url_for('static', filename='data/illness.json') }}").then(r => r.json()).then(d => { illnessData = d; });
+
+    function addDiseaseRow() {
+        let container = document.getElementById('disease_container');
+        let row = document.createElement('div');
+        row.className = 'disease-row';
+        let catsHtml = '<option value="">疾病分类</option>';
+        for (let cat in illnessData) catsHtml += `<option value="${cat}">${cat}</option>`;
+
+        row.innerHTML = `
+            <select name="disease_category[]" class="ill-cat" style="width:30%;" onchange="bindSub(this)">${catsHtml}</select>
+            <select name="disease_sub_category[]" class="ill-sub" style="width:30%;" onchange="bindSpec(this)"><option value="">疾病类型</option></select>
+            <select name="disease_specific[]" class="ill-spec" style="width:35%;"><option value="">具体疾病</option></select>
+            <button type="button" onclick="removeDiseaseRow(this)" style="width:5%; background:transparent; border:none; color:black; cursor:pointer; font-weight:bold;">✖</button>
+        `;
+        container.appendChild(row);
+    }
+
+    function removeDiseaseRow(btn) {
+        let container = document.getElementById('disease_container');
+        if (container.querySelectorAll('.disease-row').length > 1) {
+            btn.parentElement.remove();
+        }
+    }
+
+    function bindSub(catSelect) {
+        let subSelect = catSelect.parentElement.querySelector('.ill-sub');
+        let specSelect = catSelect.parentElement.querySelector('.ill-spec');
+        subSelect.length = 1; specSelect.length = 1;
+        let cat = catSelect.value;
+        if (cat && illnessData[cat]) {
+            for (let sub in illnessData[cat]) subSelect.add(new Option(sub, sub));
+        }
+    }
+
+    function bindSpec(subSelect) {
+        let catSelect = subSelect.parentElement.querySelector('.ill-cat');
+        let specSelect = subSelect.parentElement.querySelector('.ill-spec');
+        specSelect.length = 1;
+        let cat = catSelect.value, sub = subSelect.value;
+        if (cat && sub && illnessData[cat][sub]) {
+            let specs = illnessData[cat][sub];
+            for (let i=0; i<specs.length; i++) specSelect.add(new Option(specs[i], specs[i]));
+        }
+    }
+
+    const pSel = document.getElementById('province'), cSel = document.getElementById('city'), aSel = document.getElementById('area'), sSel = document.getElementById('street'), commHidden = document.getElementById('community_hidden');
+    let geoData = {};
+    fetch("{{ url_for('static', filename='data/pcas.json') }}").then(res => res.json()).then(data => { geoData = data; for (let p in geoData) pSel.add(new Option(p, p)); });
+
+    pSel.addEventListener('change', function() { cSel.length=1; aSel.length=1; sSel.length=1; commHidden.value=""; let p = this.value; if (p && geoData[p]) for (let c in geoData[p]) cSel.add(new Option(c, c)); });
+    cSel.addEventListener('change', function() { aSel.length=1; sSel.length=1; commHidden.value=""; let p = pSel.value, c = this.value; if (p && c && geoData[p][c]) for (let a in geoData[p][c]) aSel.add(new Option(a, a)); });
+    aSel.addEventListener('change', function() { sSel.length=1; commHidden.value=""; let p = pSel.value, c = cSel.value, a = this.value; if (p && c && a && geoData[p][c][a]) { let strts = geoData[p][c][a]; for (let i=0; i<strts.length; i++) sSel.add(new Option(strts[i], strts[i])); } });
+    sSel.addEventListener('change', function(){ commHidden.value = (aSel.value && sSel.value) ? aSel.value + "-" + sSel.value : ""; });
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ admin.name }} - 管理员后台</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f0f2f5; }
+        .sidebar { width: 250px; background-color: #2c3e50; color: white; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .main-content { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        .action-bar { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+        .btn-sm { padding: 6px 12px; cursor: pointer; border: none; border-radius: 3px; color: white; text-decoration: none; }
+        .btn-edit { background-color: #17a2b8; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-success { background-color: #28a745; }
+        .btn-danger { background-color: #dc3545; }
+        .module-links a { display: block; padding: 10px; color: #bdc3c7; text-decoration: none; margin-bottom: 5px; }
+        .module-links a:hover { background-color: #34495e; color: white; }
+        .notice-board { background: #fff; border-radius: 5px; padding: 15px; margin-bottom: 15px; color: #333; overflow-y: auto; max-height: 250px;}
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-top: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div style="border-bottom: 1px solid #455a64; padding-bottom: 15px; margin-bottom: 15px;">
+        <h3 style="margin:0 0 5px 0;">{{ admin.name }}</h3>
+        <p style="font-size: 12px; color: #bdc3c7; margin:0;">{{ '医疗机构管理员' if admin.role == 'medical' else '社区管理员' }}</p>
+    </div>
+
+    <h4 style="margin: 0 0 10px 0; color: white;">辖区上报看板</h4>
+    <div style="background-color: #34495e; padding: 15px; border-radius: 5px; color: white; margin-bottom: 15px;">
+        {% if alert_events and alert_events|length > 0 %}
+            <div style="background-color: #dc3545; padding: 15px; border-radius: 6px;">
+                <h4 style="margin: 0 0 10px 0; color: white;">! 辖区高危预警</h4>
+                <p style="margin: 0 0 15px 0; font-size: 13px;">检测到 <strong>{{ alert_events|length }}</strong> 起待处理事件。</p>
+                <a href="/admin/event_audit" style="background: white; color: #dc3545; padding: 8px 15px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px; display: block; text-align: center;">前往审核处理</a>
+            </div>
+        {% else %}
+            <p style="color: #bdc3c7; font-size: 14px; text-align: center; margin-top: 20px;">辖区安全状况良好</p>
+        {% endif %}
+    </div>
+
+    <h4 style="margin: 0 0 10px 0; color: white;">公告接收</h4>
+    <div class="notice-board">
+        {% if admin_notices %}
+            {% for n in admin_notices %}
+                <div style="border-bottom: 1px dashed #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                    <strong style="color: #d35400;">{{ n.title }}</strong>
+                    <span style="font-size: 12px; color: #999; float: right;">{{ n.create_time.strftime('%m-%d %H:%M') }}</span>
+                    <p style="margin: 5px 0 0 0; font-size: 13px;">{{ n.content }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: #999; font-size: 13px; margin: 0; text-align: center;">暂无公告</p>
+        {% endif %}
+    </div>
+
+    <div class="module-links" style="flex-grow: 1;">
+        <a href="/sub_admin_dashboard" style="background-color: #007bff; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+            <span>管理账号功能</span>
+            {% if unread_reports and unread_reports > 0 %}
+                <span style="background: #dc3545; padding: 2px 6px; border-radius: 10px; font-size: 11px;">{{ unread_reports }} 份新报告</span>
+            {% endif %}
+        </a>
+        <a href="/admin/health_data_select">健康数据管理</a>
+        <a href="/admin/disease_manage">病因与疾病信息管理</a>
+        <a href="/admin/event_audit">公共卫生事件审核与管理</a>
+    </div>
+    <div class="module-links"><a href="/logout" style="color: #e74c3c;">退出账号</a></div>
+</div>
+
+<div class="main-content">
+    <h3 style="margin-top: 0;">辖区人员管理</h3>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <form id="subBatchForm" method="POST" action="/admin/batch_action">
+        <input type="hidden" name="target_type" value="user">
+        <input type="hidden" name="action" id="sub_action" value="">
+
+        <div class="action-bar">
+            <div>
+                <button type="button" class="btn-sm btn-warning" onclick="submitBatch('subBatchForm', 'lock')">锁定</button>
+                <button type="button" class="btn-sm btn-success" onclick="submitBatch('subBatchForm', 'unlock')">解锁</button>
+            </div>
+            <div>
+                <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="手机号或姓名" style="padding: 6px; border: 1px solid #ccc; width:180px;">
+                <button type="submit" class="btn-sm btn-success">搜索</button>
+                <a href="/sub_admin_dashboard" class="btn-sm btn-warning" style="margin-left:5px;">重置</a>
+            </div>
+        </div>
+
+        <table>
+            <tr>
+                <th><input type="checkbox" onclick="let cb=document.querySelectorAll('input[name=ids]'); cb.forEach(c=>c.checked=this.checked);"></th>
+                <th>手机号</th>
+                <th>姓名</th>
+                <th>账户状态</th>
+                <th>管理操作</th>
+            </tr>
+            {% for u in users %}
+            <tr>
+                <td><input type="checkbox" name="ids" value="{{ u.id }}"></td>
+                <td>{{ u.phone }}</td>
+                <td>{{ u.name if u.name else '未识别' }}</td>
+                <td style="font-weight: bold;">
+                    {% if u.is_locked and u.is_frozen %} <span style="color: red;">锁定 / 冻结</span>
+                    {% elif u.is_locked %} <span style="color: #ffc107;">已锁定</span>
+                    {% elif u.is_frozen %} <span style="color: red;">已冻结</span>
+                    {% else %} <span style="color: green;">正常</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/admin/user_detail/{{ u.id }}" class="btn-sm btn-edit">管理档案</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </form>
+
+    <div class="panel">
+        <h3 style="margin-top: 0; color: #007bff; border-bottom: 2px solid #eee; padding-bottom: 10px;">辖区公告发布管理</h3>
+        <form method="POST" action="/admin/sub_notice_action" style="margin-bottom: 20px;">
+            <div style="margin-bottom: 10px;">
+                <textarea name="content" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;" placeholder="输入通知内容..." required></textarea>
+            </div>
+            <button type="submit" class="btn-sm btn-success" style="padding: 10px 20px; font-size: 14px;">发送辖区广播</button>
+        </form>
+
+        <table style="margin-top: 20px;">
+            <tr>
+                <th style="width: 150px;">发布时间</th>
+                <th>通知内容</th>
+                <th style="width: 120px;">状态/操作</th>
+            </tr>
+            {% for n in sub_notices %}
+            <tr>
+                <td style="color:#666;">{{ n.create_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ n.content }}</td>
+                <td>
+                    <form method="POST" action="/admin/notice_action" style="margin: 0;">
+                        <input type="hidden" name="notice_id" value="{{ n.id }}">
+                        <button type="submit" name="action" value="toggle" class="btn-sm btn-warning" style="margin-bottom: 5px;">
+                            {{ '恢复展示' if n.is_hidden else '隐藏' }}
+                        </button>
+                        <button type="submit" name="action" value="delete" class="btn-sm btn-danger" onclick="return confirm('彻底删除该通知？');">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<script>
+    function submitBatch(formId, actionStr) {
+        let form = document.getElementById(formId);
+        if (form.querySelectorAll('input[name="ids"]:checked').length === 0) {
+            alert("请至少勾选一行数据进行操作！"); return;
+        }
+        if (confirm("确定要执行批处理指令吗？")) {
+            document.getElementById('sub_action').value = actionStr;
+            form.submit();
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>病因与疾病信息管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .action-bar { display: flex; justify-content: space-between; margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #e9ecef;}
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+        .btn-edit { background-color: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer;}
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;}
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 650px; max-height: 90vh; overflow-y: auto;}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #333; font-size: 14px;}
+        .form-group textarea { width: 100%; padding: 12px; border: 1px solid #ccc; box-sizing: border-box; border-radius: 4px; font-family: Arial, sans-serif;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">医学百科库后台编辑系统</h2>
+        <a href="javascript:history.back()" style="text-decoration: none; color: #6c757d; font-weight: bold;">返回控制台</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="action-bar">
+        <div style="font-size: 13px; color: #666; line-height: 1.6;">
+            <strong>系统提示：</strong>本库由权威框架初始化。仅开放管理员对既有病历摘要、临床症状及干预指南的文本覆写与维护权限。
+        </div>
+        <form method="GET" action="/admin/disease_manage" style="display: flex; gap: 5px;">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="输入疾病名称检索" style="padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+            <button type="submit" style="padding: 5px 15px; background: #28a745; color: white; border: none; border-radius: 3px; cursor:pointer;">精确查找</button>
+            <a href="/admin/disease_manage" style="padding: 5px 15px; background: #ffc107; color: black; border: none; border-radius: 3px; text-decoration:none; text-align:center; line-height: 18px;">清空</a>
+        </form>
+    </div>
+
+    <table>
+        <tr>
+            <th style="width: 180px;">疾病归属体系</th>
+            <th style="width: 150px;">疾病具体名称</th>
+            <th>当前录入病理摘要</th>
+            <th>上次数据更新时间</th>
+            <th>数据维护</th>
+        </tr>
+        {% for d in diseases %}
+        <tr>
+            <td style="font-size: 12px; color: #666;">[{{ d.category }}]<br>{{ d.sub_category }}</td>
+            <td style="font-weight: bold; color: #2c3e50; font-size: 15px;">{{ d.name }}</td>
+            <td style="color: #555; font-size: 13px;">{{ d.cause[:45] }}...</td>
+            <td style="color: #999; font-size: 12px;">{{ d.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                <button type="button" class="btn-edit" onclick='openEditModal({{ d.id }}, {{ d.cause|tojson|safe }}, {{ d.symptoms|tojson|safe }}, {{ d.prevention|tojson|safe }}, "{{ d.name }}")'>更正与补充</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color:#007bff; margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">
+            维护档案数据：<span id="modalDiseaseName" style="color:#dc3545;"></span>
+        </h3>
+
+        <form method="POST" action="/admin/disease_manage">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="disease_id" id="editDiseaseId" value="">
+
+            <div class="form-group">
+                <label>病理及致病因分析</label>
+                <textarea name="cause" id="editCause" rows="4" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>特异性临床症状</label>
+                <textarea name="symptoms" id="editSymptoms" rows="4" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>日常防护与临床干预指南</label>
+                <textarea name="prevention" id="editPrevention" rows="4" required></textarea>
+            </div>
+
+            <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 25px;">
+                <button type="button" style="padding:10px 20px; background:#6c757d; color:white; border:none; border-radius: 3px; cursor:pointer;" onclick="document.getElementById('editModal').style.display='none'">放弃修改</button>
+                <button type="submit" style="padding:10px 20px; background:#28a745; color:white; border:none; border-radius: 3px; cursor:pointer; font-weight:bold;">覆写数据</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openEditModal(id, cause, symptoms, prev, name) {
+        document.getElementById('editDiseaseId').value = id;
+        document.getElementById('modalDiseaseName').innerText = name;
+        document.getElementById('editCause').value = cause;
+        document.getElementById('editSymptoms').value = symptoms;
+        document.getElementById('editPrevention').value = prev;
+        document.getElementById('editModal').style.display = 'flex';
+    }
+</script>
+</body>
+</html>

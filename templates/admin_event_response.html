@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>公共卫生事件响应与通知下发</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 900px; }
+        .panel { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+
+        .event-item { border: 1px solid #dc3545; border-radius: 6px; margin-bottom: 15px; overflow: hidden; }
+        .event-header { background: #ffeeba; padding: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #856404;}
+        .event-header.severe { background: #f8d7da; color: #721c24; }
+        .event-body { display: none; padding: 20px; background: white; border-top: 1px solid #dc3545; font-size: 14px; line-height: 1.6;}
+        .event-body.open { display: block; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #333; font-size: 14px;}
+        .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; box-sizing: border-box; border-radius: 4px;}
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+        .btn-submit { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;}
+        .btn-action { padding: 6px 12px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; font-size: 13px;}
+
+        /* 公告表格样式 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background:#d4edda; color:#155724; padding:15px; border-radius:4px; margin-bottom:20px; font-weight:bold; text-align:center;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="panel">
+        <div class="header">
+            <h2 style="margin: 0; color: #dc3545;">紧急升级与危重事件处理区</h2>
+            <a href="/super_admin_dashboard" style="color: #6c757d; text-decoration: none; font-weight: bold;">返回超级后台</a>
+        </div>
+
+        {% if red_events %}
+            {% for ev in red_events %}
+            <div class="event-item">
+                <div class="event-header severe" onclick="toggleEvent(this)">
+                    <span>{{ ev.province }}{{ ev.city }} - 疑似 [{{ ev.disease_specific }}] 事件</span>
+                    <span>上报时间: {{ ev.created_at.strftime('%m-%d %H:%M') }} ▼</span>
+                </div>
+                <div class="event-body">
+                    <p><strong>发生地点：</strong>{{ ev.province }}{{ ev.city }}{{ ev.community }} {{ ev.specific_location }}</p>
+                    <p><strong>初报内容：</strong>{{ ev.content }}</p>
+                    <div style="background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 15px 0;">
+                        <strong>次级管理员情况补充 (升级附言)：</strong><br>
+                        {{ ev.escalation_note if ev.escalation_note else '自动触发升级，无补充说明。' }}
+                    </div>
+                    <div style="text-align: right; margin-top: 15px;">
+                        <a href="/admin/event_audit" class="btn-action">前往审核大厅进行锁定/处理管理</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="text-align: center; color: #28a745; font-weight: bold; padding: 20px;">当前系统平稳，无危重或升级事件需要响应。</p>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <div class="header"><h2 style="margin: 0; color: #007bff;">靶向通知发布系统</h2></div>
+
+        <form method="POST" action="/admin/event_response">
+            <div class="form-group" style="background: #f8f9fa; padding: 15px; border: 1px solid #eee; border-radius: 4px;">
+                <label style="color: #d35400;">第一层：区域覆盖选择 (留空则全系统下发)</label>
+                <div class="grid-3">
+                    <select id="province" name="target_province" onchange="generateTemplate()"><option value="">全部省份覆盖</option></select>
+                    <select id="city" name="target_city" onchange="generateTemplate()"><option value="">全部城市覆盖</option></select>
+                    <select id="area" name="target_community" onchange="generateTemplate()"><option value="">全部区县/街道覆盖</option></select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>第二/三层：接收对象选择</label>
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <label style="font-weight: normal; margin: 0;"><input type="radio" name="notify_users" value="no" checked> 仅内部传达 (下级管理员界面)</label>
+                    <label style="font-weight: normal; margin: 0;"><input type="radio" name="notify_users" value="yes"> <strong>向民众公开广播 (下发至辖区用户端)</strong></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex; justify-content:space-between;">
+                    <span>通知下发内容：</span>
+                    <button type="button" onclick="generateTemplate()" style="font-size:12px; cursor:pointer;">生成标准预警模板</button>
+                </label>
+                <textarea name="content" id="noticeContent" rows="5" required placeholder="请输入传递内容..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit">确认靶向发送通知</button>
+        </form>
+    </div>
+
+    <div class="panel" id="notice_manage">
+        <div class="header"><h2 style="margin: 0; color: #28a745;">系统公告与通知管理</h2></div>
+        <table>
+            <tr>
+                <th>发布时间</th>
+                <th>覆盖区域</th>
+                <th>接收对象</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+            {% for n in notices %}
+            <tr>
+                <td>{{ n.create_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ (n.target_province or '全国') ~ ' ' ~ (n.target_city or '') }}</td>
+                <td>{{ '用户端' if n.target_audience == 'user' else '仅管理员' }}</td>
+                <td style="color: {{ 'red' if n.is_hidden else 'green' }}; font-weight: bold;">
+                    {{ '已隐藏' if n.is_hidden else '展示中' }}
+                </td>
+                <td>
+                    <form method="POST" action="/admin/notice_action" style="display: inline;">
+                        <input type="hidden" name="notice_id" value="{{ n.id }}">
+                        <button type="submit" name="action" value="toggle" style="background:#ffc107; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">
+                            {{ '恢复展示' if n.is_hidden else '强制隐藏' }}
+                        </button>
+                        <button type="submit" name="action" value="delete" style="background:#dc3545; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;" onclick="return confirm('确定要彻底删除该通知吗？');">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<script>
+    function toggleEvent(headerEl) {
+        let body = headerEl.nextElementSibling;
+        body.classList.toggle('open');
+    }
+
+    const pSel = document.getElementById('province'), cSel = document.getElementById('city'), aSel = document.getElementById('area');
+    let geoData = {};
+    fetch("{{ url_for('static', filename='data/pcas.json') }}").then(r=>r.json()).then(d=>{ geoData=d; for(let p in d) pSel.add(new Option(p,p)); });
+
+    pSel.addEventListener('change', function(){
+        cSel.length=1; aSel.length=1; let p = this.value;
+        if(p && geoData[p]) for(let c in geoData[p]) cSel.add(new Option(c,c));
+    });
+    cSel.addEventListener('change', function(){
+        aSel.length=1; let p=pSel.value, c=this.value;
+        if(p && c && geoData[p][c]) for(let a in geoData[p][c]) aSel.add(new Option(a,a));
+    });
+
+    function generateTemplate() {
+        let p = pSel.value, c = cSel.value, a = aSel.value;
+        let loc = (p || c || a) ? (p + c + a) : "本系统所有辖区";
+        let text = `【紧急通知】\n您的所在区域 [ ${loc} ] 疑似有 [ 传染性 ] 疾病风险。\n请您做好个人防护，尽量减少外出，等待社区的进一步防疫通知。`;
+        document.getElementById('noticeContent').value = text;
+    }
+</script>
+</body>
+</html>

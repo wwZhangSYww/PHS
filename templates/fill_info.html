@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>基础信息完善</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+        .form-container { background: white; padding: 30px; border-radius: 8px; width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input[readonly] { background-color: #e9ecef; color: #666; cursor: not-allowed; }
+        button { width: 100%; padding: 10px; background-color: #5cb85c; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;}
+        button:hover { background-color: #4cae4c; }
+        .error-msg { color: red; font-size: 12px; display: none; margin-top: 5px; }
+    </style>
+</head>
+<body>
+<div class="form-container">
+    <h3 style="text-align: center; color: #d9534f;">系统提示：基础信息未填写，请补充</h3>
+    <form method="POST" action="/fill_info" id="infoForm">
+        <div class="form-group">
+            <label>手机号 (自动同步):</label>
+            <input type="text" value="{{ user.phone }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>姓名 (必填):</label>
+            <input type="text" name="name" required>
+        </div>
+        <div class="form-group">
+            <label>性别 (必填):</label>
+            <select name="gender" required>
+                <option value="">请选择性别</option>
+                <option value="男">男</option>
+                <option value="女">女</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>地区 (必填):</label>
+            <span id="loadError" class="error-msg">数据包读取失败，请检查文件路径</span>
+            <select id="province" name="province" required><option value="">请选择省份</option></select>
+            <select id="city" name="city" required style="margin-top: 8px;"><option value="">请选择城市</option></select>
+            <select id="area" required style="margin-top: 8px;"><option value="">请选择区/县</option></select>
+            <select id="street" required style="margin-top: 8px;"><option value="">请选择街道/乡镇</option></select>
+
+            <input type="hidden" id="community_hidden" name="community" required>
+        </div>
+        <div class="form-group">
+            <label>详细地址 (必填):</label>
+            <input type="text" name="address" required placeholder="如：XX小区XX号楼XX室">
+        </div>
+        <div class="form-group">
+            <label>身高 (cm, 必填):</label>
+            <input type="number" step="0.1" name="height" required>
+        </div>
+        <div class="form-group">
+            <label>体重 (kg, 必填):</label>
+            <input type="number" step="0.1" name="weight" required>
+        </div>
+        <div class="form-group">
+            <label>血型 (必填):</label>
+            <select name="blood_type" required>
+                <option value="">请选择血型</option>
+                <option value="A型">A型</option>
+                <option value="B型">B型</option>
+                <option value="AB型">AB型</option>
+                <option value="O型">O型</option>
+                <option value="未知">未知</option>
+            </select>
+        </div>
+        <button type="submit">应用更改</button>
+    </form>
+</div>
+
+<script>
+    const provSelect = document.getElementById('province');
+    const citySelect = document.getElementById('city');
+    const areaSelect = document.getElementById('area');
+    const streetSelect = document.getElementById('street');
+    const communityHidden = document.getElementById('community_hidden');
+
+    let geoData = {};
+
+    // 1. 读取本地 JSON
+    fetch("{{ url_for('static', filename='data/pcas.json') }}")
+        .then(response => {
+            if (!response.ok) throw new Error('网络响应错误');
+            return response.json();
+        })
+        .then(data => {
+            geoData = data;
+            // 遍历第一层：省份（如 "北京市", "天津市"）
+            for (let prov in geoData) {
+                provSelect.add(new Option(prov, prov));
+            }
+        })
+        .catch(error => {
+            console.error('加载失败:', error);
+            document.getElementById('loadError').style.display = 'block';
+        });
+
+    // 2. 省份变化，加载城市
+    provSelect.addEventListener('change', function() {
+        citySelect.length = 1;
+        areaSelect.length = 1;
+        streetSelect.length = 1;
+        updateHiddenValue();
+
+        let prov = this.value;
+        if (prov && geoData[prov]) {
+            // 遍历第二层（如 "市辖区", 或者是具体城市名）
+            for (let cityGroup in geoData[prov]) {
+                citySelect.add(new Option(cityGroup, cityGroup));
+            }
+        }
+    });
+
+    // 3. 城市变化，加载区县
+    citySelect.addEventListener('change', function() {
+        areaSelect.length = 1;
+        streetSelect.length = 1;
+        updateHiddenValue();
+
+        let prov = provSelect.value;
+        let cityGroup = this.value;
+
+        if (prov && cityGroup && geoData[prov][cityGroup]) {
+            // 遍历第三层：区/县（如 "东城区", "西城区"）
+            for (let area in geoData[prov][cityGroup]) {
+                areaSelect.add(new Option(area, area));
+            }
+        }
+    });
+
+    // 4. 区县变化，加载街道
+    areaSelect.addEventListener('change', function() {
+        streetSelect.length = 1;
+        updateHiddenValue();
+
+        let prov = provSelect.value;
+        let cityGroup = citySelect.value;
+        let area = this.value;
+
+        if (prov && cityGroup && area && geoData[prov][cityGroup][area]) {
+            // 第四层是数组，直接遍历街道名
+            let streets = geoData[prov][cityGroup][area];
+            for (let i = 0; i < streets.length; i++) {
+                streetSelect.add(new Option(streets[i], streets[i]));
+            }
+        }
+    });
+
+    // 5. 街道变化，更新隐藏表单
+    streetSelect.addEventListener('change', updateHiddenValue);
+
+    function updateHiddenValue() {
+        let areaVal = areaSelect.value;
+        let streetVal = streetSelect.value;
+        if (areaVal && streetVal) {
+            communityHidden.value = areaVal + "-" + streetVal;
+        } else {
+            communityHidden.value = "";
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理员档案管理 - {{ admin.account }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 600px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 14px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .submit-btn { width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+        .current-location { background: #e9ecef; padding: 10px; border-radius: 4px; font-size: 14px; margin-bottom: 10px; color: #555;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">次级管理员信息修改</h2>
+        <a href="/admin/manage_accounts" style="text-decoration: none; color: #007bff; font-weight: bold;">返回批处理列表</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="form-group">
+            <label>当前权限类型 (禁止跨权修改)</label>
+            <input type="text" value="{{ '社区管理员' if admin.role == 'community' else '医疗机构管理员' }}" disabled style="background: #f8f9fa;">
+        </div>
+
+        <div class="form-group">
+            <label>登录账号 (可修改，不可重复)</label>
+            <input type="text" name="account" value="{{ admin.account }}" required>
+        </div>
+
+        <div class="form-group">
+            <label>账号显示名称 (可修改，不可重复)</label>
+            <input type="text" name="name" value="{{ admin.name }}" required>
+        </div>
+
+        <div class="form-group">
+            <label>管理员绑定手机号</label>
+            <input type="text" name="phone" value="{{ admin.phone or '' }}">
+        </div>
+
+        <div class="form-group">
+            <label>强制重置密码 (留空则不修改)</label>
+            <input type="password" name="new_password" placeholder="输入新密码">
+        </div>
+
+        <div style="border-top: 1px dashed #ccc; margin: 20px 0;"></div>
+
+        <div class="form-group">
+            <label>修改管辖地区 (如不修改请勿触碰下拉框)</label>
+            <div class="current-location">
+                当前辖区: <strong>{{ admin.province }} {{ admin.city }} {{ admin.community if admin.role == 'community' else admin.medical_org }}</strong>
+            </div>
+
+            <select id="province" name="province"><option value="">-- 修改省份 --</option></select>
+            <select id="city" name="city" style="margin-top: 8px;"><option value="">-- 修改城市 --</option></select>
+
+            {% if admin.role == 'community' %}
+            <select id="area" style="margin-top: 8px;"><option value="">-- 修改区/县 --</option></select>
+            <select id="street" style="margin-top: 8px;"><option value="">-- 修改街道/乡镇 --</option></select>
+            <input type="hidden" id="community_hidden" name="community">
+            {% else %}
+            <input type="text" name="medical_org" placeholder="修改医疗机构名称" style="margin-top: 8px;">
+            {% endif %}
+        </div>
+
+        <button type="submit" class="submit-btn">确认并强制覆盖信息</button>
+    </form>
+</div>
+
+<script>
+    const pSel = document.getElementById('province');
+    const cSel = document.getElementById('city');
+    const aSel = document.getElementById('area');
+    const sSel = document.getElementById('street');
+    const commHidden = document.getElementById('community_hidden');
+    let gData = {};
+
+    fetch("{{ url_for('static', filename='data/pcas.json') }}")
+        .then(res => res.json())
+        .then(data => {
+            gData = data;
+            for (let p in gData) pSel.add(new Option(p, p));
+        });
+
+    pSel.addEventListener('change', function() {
+        cSel.length=1; if(aSel) aSel.length=1; if(sSel) sSel.length=1; if(commHidden) commHidden.value="";
+        let p = this.value;
+        if (p && gData[p]) for (let c in gData[p]) cSel.add(new Option(c, c));
+    });
+
+    cSel.addEventListener('change', function() {
+        if(!aSel) return;
+        aSel.length=1; sSel.length=1; commHidden.value="";
+        let p = pSel.value, c = this.value;
+        if (p && c && gData[p][c]) for (let a in gData[p][c]) aSel.add(new Option(a, a));
+    });
+
+    if(aSel) {
+        aSel.addEventListener('change', function() {
+            sSel.length=1; commHidden.value="";
+            let p = pSel.value, c = cSel.value, a = this.value;
+            if (p && c && a && gData[p][c][a]) {
+                let strts = gData[p][c][a];
+                for (let i=0; i<strts.length; i++) sSel.add(new Option(strts[i], strts[i]));
+            }
+        });
+        sSel.addEventListener('change', function(){
+            if(aSel.value && sSel.value) commHidden.value = aSel.value + "-" + sSel.value;
+            else commHidden.value = "";
+        });
+    }
+</script>
+</body>
+</html>

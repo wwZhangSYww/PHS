@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>健康数据管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 1000px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .btn-sm { padding: 8px 15px; border: none; border-radius: 3px; color: white; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold;}
+
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;}
+        .panel { border: 1px solid #e0e0e0; padding: 20px; border-radius: 6px; background: #fafafa; }
+        .panel-title { font-size: 16px; font-weight: bold; color: #2c3e50; border-left: 4px solid #007bff; padding-left: 10px; margin-top: 0; }
+
+        .info-row { margin-bottom: 10px; font-size: 14px; border-bottom: 1px dashed #ddd; padding-bottom: 5px;}
+        .info-label { font-weight: bold; color: #555; display: inline-block; width: 100px; }
+
+        .viewer-container { width: 100%; height: 300px; background: #333; display: flex; align-items: center; justify-content: center; position: relative; border-radius: 4px; overflow: hidden; margin-top: 15px;}
+        .viewer-img { max-width: 100%; max-height: 100%; }
+        .viewer-ctrl { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; padding: 10px; cursor: pointer;}
+        .ctrl-prev { left: 10px; } .ctrl-next { right: 10px; }
+
+        .advice-box { height: 200px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 15px; border-radius: 4px; font-size: 14px; line-height: 1.6; margin-bottom: 15px;}
+
+        button:disabled { background-color: #ccc !important; cursor: not-allowed; }
+        input:disabled { background-color: #e9ecef; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2 style="margin:0; color:#2c3e50;">健康数据管理</h2>
+        <a href="/user_dashboard" style="color:#6c757d; font-weight:bold; text-decoration:none;">返回主页</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="GET" style="margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 4px;">
+        <label style="font-weight: bold;">选择医疗档案：</label>
+        <select name="member_id" onchange="this.form.submit()" style="padding: 8px; width: 250px;">
+            {% for m in user.family_members %}
+            <option value="{{ m.id }}" {% if selected_member and selected_member.id == m.id %}selected{% endif %}>{{ m.name }} ({{ m.relation }})</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if selected_member %}
+    <div class="grid-layout">
+        <div class="panel">
+            <h3 class="panel-title">基础指标</h3>
+            <div class="info-row"><span class="info-label">档案持有者:</span> {{ selected_member.name }}</div>
+            <div class="info-row"><span class="info-label">年龄 / 性别:</span> {{ selected_member.age or '-' }} 岁 / {{ selected_member.gender }}</div>
+            <div class="info-row"><span class="info-label">身高 / 体重:</span> {{ selected_member.height or '-' }} cm / {{ selected_member.weight or '-' }} kg</div>
+            <div class="info-row"><span class="info-label">收缩压 (高压):</span> {{ selected_member.blood_pressure_systolic or '-' }} mmHg</div>
+            <div class="info-row"><span class="info-label">舒张压 (低压):</span> {{ selected_member.blood_pressure_diastolic or '-' }} mmHg</div>
+        </div>
+
+        <div class="panel">
+            <h3 class="panel-title">疾病档案</h3>
+            <div style="font-size: 14px; color: #dc3545; font-weight: bold; white-space: pre-wrap; line-height: 1.6;">{{ selected_member.disease_info if selected_member.disease_info else '无病史记录。' }}</div>
+        </div>
+
+        <div class="panel">
+            <h3 class="panel-title">电子版报告展示与上传</h3>
+
+            <form method="POST" action="/upload_medical_report" enctype="multipart/form-data" style="margin-top: 15px; display: flex; gap: 10px;">
+                <input type="hidden" name="member_id" value="{{ selected_member.id }}">
+                <input type="file" name="report_file" accept="image/*" required style="flex-grow:1; border:1px solid #ccc; padding:5px;" {% if user.is_locked %}disabled{% endif %}>
+                <button type="submit" class="btn-sm" style="background:#28a745;" {% if user.is_locked %}disabled{% endif %}>上传</button>
+            </form>
+
+            {% set reports = selected_member.medical_reports|sort(attribute='upload_time', reverse=True) %}
+            <div class="viewer-container">
+                {% if reports %}
+                    <img id="reportViewer" src="{{ url_for('static', filename=reports[0].file_path) }}" class="viewer-img">
+                    <button class="viewer-ctrl ctrl-prev" onclick="changeImage(-1)">◀</button>
+                    <button class="viewer-ctrl ctrl-next" onclick="changeImage(1)">▶</button>
+                {% else %}
+                    <span style="color:#aaa;">暂无报告</span>
+                {% endif %}
+            </div>
+            {% if reports %}
+            <div style="text-align:center; font-size:12px; color:#666; margin-top:5px;"><span id="imgIndex">1</span> / {{ reports|length }}</div>
+            {% endif %}
+        </div>
+
+        <div class="panel">
+            <h3 class="panel-title" style="border-left-color:#dc3545; color:#dc3545;">医护人员通知/医嘱</h3>
+            <div class="advice-box" style="height: 120px; background:#fff8f8; border-color:#dc3545;">
+                {{ selected_member.admin_advice if selected_member.admin_advice else '暂无医嘱。' }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    {% if selected_member and selected_member.medical_reports %}
+    const images = [
+        {% for r in selected_member.medical_reports|sort(attribute='upload_time', reverse=True) %}
+        "{{ url_for('static', filename=r.file_path) }}",
+        {% endfor %}
+    ];
+    let currentIndex = 0;
+    function changeImage(step) {
+        currentIndex += step;
+        if (currentIndex < 0) currentIndex = images.length - 1;
+        if (currentIndex >= images.length) currentIndex = 0;
+        document.getElementById('reportViewer').src = images[currentIndex];
+        document.getElementById('imgIndex').innerText = currentIndex + 1;
+    }
+    {% endif %}
+</script>
+</body>
+</html>

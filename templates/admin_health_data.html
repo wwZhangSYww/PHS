@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>健康数据管理</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center;}
+        .container { background: white; padding: 30px; border-radius: 8px; width: 900px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .panel { border: 1px solid #ddd; padding: 20px; border-radius: 6px; background: #fafafa; }
+        .panel-title { font-size: 16px; font-weight: bold; color: #007bff; border-left: 4px solid #007bff; padding-left: 10px; margin-top: 0; margin-bottom: 15px;}
+        .info-row { margin-bottom: 10px; font-size: 14px; border-bottom: 1px dashed #eee; padding-bottom: 6px;}
+        .info-label { font-weight: bold; color: #555; display: inline-block; width: 100px; }
+        .btn-sm { padding: 6px 12px; border: none; border-radius: 3px; color: white; cursor: pointer; font-size: 13px;}
+
+        button:disabled { background-color: #ccc !important; cursor: not-allowed; color: #666 !important; }
+        input:disabled, textarea:disabled { background-color: #e9ecef; cursor: not-allowed; color: #666; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">健康数据管理 - {{ m.name }}</h2>
+        <div>
+            <a href="/admin/health_data_select" style="color:#007bff; text-decoration:none; font-weight:bold; margin-right: 15px;">返回选择</a>
+            <a href="{{ '/super_admin_dashboard' if session.get('role') == 'super' else '/sub_admin_dashboard' }}" style="color:#6c757d; text-decoration:none; font-weight:bold;">返回主页</a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div style="background:#d4edda; color:#155724; padding:10px; border-radius:4px; margin-bottom:20px; font-weight:bold; text-align:center;">{{ messages[0] }}</div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="grid-layout">
+        <div>
+            <div class="panel">
+                <h3 class="panel-title">基础生理指标</h3>
+                <div class="info-row"><span class="info-label">主账号溯源:</span> User-{{ m.user_id }}</div>
+                <div class="info-row"><span class="info-label">家庭结构:</span> {{ m.relation }}</div>
+                <div class="info-row"><span class="info-label">年龄 / 性别:</span> {{ m.age or '-' }} / {{ m.gender }}</div>
+                <div class="info-row"><span class="info-label">血压:</span> <strong style="color:#dc3545;">{{ m.blood_pressure_systolic or '-' }}/{{ m.blood_pressure_diastolic or '-' }}</strong> mmHg</div>
+                <div class="info-row"><span class="info-label">身高 / 体重:</span> {{ m.height or '-' }}cm / {{ m.weight or '-' }}kg</div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <h3 class="panel-title">医疗指导与医嘱</h3>
+                <form method="POST">
+                    <input type="hidden" name="action" value="update_advice">
+                    <textarea name="admin_advice" rows="6" style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;" {% if m.user.is_locked %}disabled placeholder="您的数据已被锁定"{% else %}placeholder="输入医嘱..."{% endif %}>{{ m.admin_advice or '' }}</textarea>
+                    <button type="submit" class="btn-sm" style="background:#dc3545; width: 100%; margin-top: 10px; padding: 10px; font-weight:bold;" {% if m.user.is_locked %}disabled{% endif %}>
+                        {% if m.user.is_locked %}已锁定{% else %}更新并推送到用户端{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 class="panel-title">电子版报告展示与上传</h3>
+            <form method="POST" enctype="multipart/form-data" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee;">
+                <input type="hidden" name="action" value="upload_report">
+                <div style="display: flex; gap: 10px;">
+                    <input type="file" name="report_file" accept="image/*" required style="border: 1px solid #ccc; padding: 5px; flex-grow: 1;" {% if m.user.is_locked %}disabled{% endif %}>
+                    <button type="submit" class="btn-sm" style="background: #28a745;" {% if m.user.is_locked %}disabled{% endif %}>更新</button>
+                </div>
+            </form>
+
+            <div style="max-height: 400px; overflow-y: auto;">
+                {% set reports = m.medical_reports|sort(attribute='upload_time', reverse=True) %}
+                {% if reports %}
+                    {% for r in reports %}
+                    <div style="border: 1px solid #ccc; border-radius: 4px; padding: 10px; margin-bottom: 15px; background: white;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12px; color: #666;">
+                            <span>上传人: <strong>{{ '用户端提交' if r.uploader_role == 'user' else '管理系统更新' }}</strong></span>
+                            <span>{{ r.upload_time.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        <a href="{{ url_for('static', filename=r.file_path) }}" target="_blank">
+                            <img src="{{ url_for('static', filename=r.file_path) }}" style="width: 100%; max-height: 150px; object-fit: cover; border-radius: 3px; border: 1px solid #eee;">
+                        </a>
+                        <form method="POST" style="margin-top: 10px; text-align: right;" onsubmit="return confirm('确认删除该报告？');">
+                            <input type="hidden" name="action" value="delete_report">
+                            <input type="hidden" name="report_id" value="{{ r.id }}">
+                            <button type="submit" class="btn-sm" style="background: #6c757d;" {% if m.user.is_locked %}disabled{% endif %}>删除</button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align: center; color: #999; padding: 30px 0;">无记录。</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

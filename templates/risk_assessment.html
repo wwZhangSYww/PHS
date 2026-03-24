@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>健康风险评估</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 800px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .btn-submit { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px;}
+
+        .result-panel { margin-top: 30px; border-radius: 6px; padding: 20px; border: 1px solid #ccc; }
+        .result-danger { background: #fff8f8; border-color: #dc3545; }
+        .result-success { background: #f0fdf4; border-color: #28a745; }
+        .result-error { background: #f8f9fa; border-color: #ffc107; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">健康风险评估</h2>
+        <a href="/user_dashboard" style="color: #6c757d; font-weight: bold; text-decoration: none;">返回主页</a>
+    </div>
+
+    <div style="background: #e9ecef; padding: 15px; border-radius: 4px; font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.6;">
+        必须填写<strong>【年龄】、【性别】、【收缩压】、【舒张压】</strong>才能进行测算。
+    </div>
+
+    <form method="POST" action="/risk_assessment" style="border: 1px solid #ddd; padding: 20px; border-radius: 6px;">
+        <label style="font-weight: bold; font-size: 15px; display: block; margin-bottom: 10px;">选择测算对象</label>
+        <div style="display: flex; gap: 15px;">
+            <select name="member_id" required style="padding: 10px; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; font-size: 15px;">
+                <option value="">-- 请选择 --</option>
+                {% for m in user.family_members %}
+                <option value="{{ m.id }}">{{ m.name }} (完整度: {{ '正常' if m.age and m.blood_pressure_systolic else '缺失必填项' }})</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-submit">开始测算</button>
+        </div>
+    </form>
+
+    {% if result %}
+    <div class="result-panel result-{{ result.status }}">
+        <h3 style="margin-top: 0; color: {{ '#dc3545' if result.status == 'danger' else ('#28a745' if result.status == 'success' else '#856404') }}; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px;">
+            评估结果
+        </h3>
+
+        {% if result.status == 'error' %}
+            <p style="color: #856404; font-weight: bold;">[提示] {{ result.msg }}</p>
+        {% else %}
+            <ul style="line-height: 1.8; font-size: 15px; color: #333;">
+                {% for item in result.msg %}
+                <li style="margin-bottom: 10px;">{{ item|safe }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

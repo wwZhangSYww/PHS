@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>公共健康系统 - 首页</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; background-color: #f4f7f6; }
+        .sidebar { width: 250px; background-color: #2c3e50; color: white; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .main-content { flex-grow: 1; padding: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-content: start;}
+
+        .top-info { border-bottom: 1px solid #455a64; padding-bottom: 15px; margin-bottom: 15px; }
+        .top-info h3 { margin: 0 0 5px 0; }
+
+        .module-card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; font-size: 18px; font-weight: bold; cursor: pointer; text-decoration: none; color: #333; display: flex; align-items: center; justify-content: center; min-height: 120px; transition: 0.3s;}
+        .module-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); color: #007bff;}
+
+        .bottom-links { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+        .bottom-links a { color: #bdc3c7; text-decoration: none; font-size: 14px; }
+        .bottom-links a:hover { color: white; }
+
+        .notice-board { background: #34495e; border-radius: 6px; padding: 15px; flex-grow: 1; overflow-y: auto; margin-bottom: 20px;}
+        .notice-item { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px; margin-bottom: 10px; }
+        .notice-item h4 { margin: 0 0 5px 0; color: #f1c40f; font-size: 14px;}
+        .notice-item p { margin: 0; font-size: 13px; color: #ecf0f1; line-height: 1.4;}
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="top-info">
+        <h3>欢迎您，{{ user.name if user.name else '用户' }}</h3>
+        <p style="font-size: 12px; color: #bdc3c7; margin:0;">您的专属片区管理员：<br><strong style="color:white;">{{ admin_name }}</strong></p>
+    </div>
+
+    <h4 style="margin: 0 0 10px 0;">系统通知与紧急公告</h4>
+    <div class="notice-board">
+        {% if notices %}
+            {% for n in notices %}
+                <div class="notice-item" style="{{ 'border-left: 4px solid #e74c3c;' if n.target_audience == 'user' else '' }}">
+                    <h4>{{ n.title }}</h4>
+                    <p>{{ n.content }}</p>
+                    <div style="font-size: 10px; color: #95a5a6; margin-top: 5px; text-align: right;">{{ n.create_time.strftime('%m-%d %H:%M') }}</div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: #95a5a6; font-size: 13px; text-align: center; margin-top: 20px;">暂无通知</p>
+        {% endif %}
+    </div>
+
+    <div class="bottom-links">
+        <a href="/profile">个人账号管理</a>
+        <a href="/logout" style="color: #e74c3c;">退出账号</a>
+    </div>
+</div>
+
+<div class="main-content">
+    <a href="/risk_assessment" class="module-card">个人健康数据风险评估自测</a>
+    <a href="/public_health_report" class="module-card">突发公共卫生事件报告</a>
+    <a href="/disease_info" class="module-card">疾病信息科普与查询</a>
+    <a href="/family_management" class="module-card">智慧家庭医生管理</a>
+
+    <a href="/user_health_data" class="module-card" style="grid-column: span 2;">健康数据管理</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>疾病信息科普与查询</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 8px; width: 900px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .btn-back { padding: 8px 15px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;}
+
+        .search-bar { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 10px; border: 1px solid #e9ecef;}
+        .search-bar input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;}
+        .search-bar button { padding: 10px 25px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;}
+
+        .list-layout { display: flex; flex-direction: column; gap: 20px; }
+        .disease-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 25px; background: #fafafa; transition: box-shadow 0.2s;}
+        .disease-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+        .d-cat { font-size: 13px; color: #fff; background: #17a2b8; padding: 4px 10px; border-radius: 3px; display: inline-block; margin-bottom: 15px; font-weight: bold;}
+        .d-name { margin: 0 0 20px 0; color: #2c3e50; font-size: 22px; border-left: 5px solid #dc3545; padding-left: 12px;}
+
+        .info-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+        .info-box { font-size: 14px; line-height: 1.7; color: #444; background: white; padding: 15px; border-radius: 6px; border: 1px solid #eee;}
+        .info-title { font-weight: bold; color: #2c3e50; display: block; margin-bottom: 8px; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2 style="margin: 0; color: #2c3e50;">医学病理与健康干预科普库</h2>
+        <a href="/user_dashboard" class="btn-back">返回主页</a>
+    </div>
+
+    <p style="color: #666; font-size: 15px; margin-bottom: 25px;">
+        在此检索由系统收录的临床病理摘要及干预指南。增强个人健康管理，做到疾病早防早治。
+    </p>
+
+    <form class="search-bar" method="GET" action="/disease_info">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="精准检索疾病名称，如：高血压、糖尿病...">
+        <button type="submit">全库检索</button>
+        <a href="/disease_info" style="padding: 10px 15px; background: #ffc107; color: black; border-radius: 4px; text-decoration: none; text-align:center; line-height: 20px;">清空检索</a>
+    </form>
+
+    {% if diseases %}
+        <div class="list-layout">
+            {% for d in diseases %}
+            <div class="disease-card" id="{{ d.name }}">
+                <div class="d-cat">{{ d.category }} - {{ d.sub_category }}</div>
+                <h3 class="d-name">{{ d.name }}</h3>
+
+                <div class="info-grid">
+                    <div class="info-box">
+                        <span class="info-title">病理分析</span>
+                        {{ d.cause }}
+                    </div>
+                    <div class="info-box">
+                        <span class="info-title">临床表现</span>
+                        {{ d.symptoms }}
+                    </div>
+                    <div class="info-box" style="border-color: #b5e4ca; background: #f0fdf4;">
+                        <span class="info-title" style="color: #155724; border-bottom-color: #b5e4ca;">干预与防治指南</span>
+                        {{ d.prevention }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 50px; color: #999; border: 1px dashed #ccc; border-radius: 8px;">
+            未检索到相关病理数据，您可以尝试更换医学名词。
+        </div>
+    {% endif %}
+</div>
+
+</body>
+</html>
